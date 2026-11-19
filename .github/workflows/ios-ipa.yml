@@ -1,0 +1,76 @@
+# Builds an UNSIGNED .ipa for sideloading onto an iPhone (Sideloadly / AltStore sign it with
+# your own Apple ID during install). Run it from the Actions tab ("Run workflow"); the .ipa is
+# attached to the run as an artifact. Public repositories get macOS minutes free.
+name: iOS IPA (unsigned, for sideloading)
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write # lets tag builds publish the .ipa as a release download
+
+jobs:
+  ipa:
+    runs-on: macos-26
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install JavaScript dependencies
+        run: npm ci
+
+      - name: Generate the iOS project
+        run: CI=1 npx expo prebuild --platform ios --clean
+
+      - name: Install CocoaPods
+        working-directory: ios
+        run: pod install
+
+      - name: Build (no code signing)
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -workspace ios/UKLifeDropAED.xcworkspace \
+            -scheme UKLifeDropAED \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -archivePath build/UKLifeDropAED.xcarchive \
+            -skipPackagePluginValidation \
+            archive \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" DEVELOPMENT_TEAM="" \
+            | tail -n 200
+
+      - name: Package .ipa
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          mkdir -p build/Payload
+          cp -R build/UKLifeDropAED.xcarchive/Products/Applications/UKLifeDropAED.app build/Payload/
+          (cd build && zip -qry "UK-LifeDrop-AED-$VERSION-unsigned.ipa" Payload)
+          ls -lh build/*.ipa
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: UK-LifeDrop-AED-ipa
+          path: build/*.ipa
+          retention-days: 30
+
+      - name: Publish as a release download (tag builds only)
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: build/*.ipa
+          body: |
+            Unsigned iPhone build for sideloading (Sideloadly / AltStore sign it with your Apple ID).
+            Minimum iOS 16.4. In a cardiac emergency, always call 999 first.

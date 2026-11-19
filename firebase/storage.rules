@@ -1,0 +1,14 @@
+rules_version = '2';
+
+// Cabinet photos: public read, create-only, images under 5 MB.
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /defib-photos/{fileName} {
+      allow read: if true;
+      allow create: if fileName.matches('[A-Za-z0-9-]+\\.jpg')
+        && request.resource.size < 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+      allow update, delete: if false;
+    }
+  }
+}

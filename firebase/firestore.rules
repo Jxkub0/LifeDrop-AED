@@ -1,0 +1,44 @@
+rules_version = '2';
+
+// Community-added defibrillators.
+// Anyone can read; anyone can create a well-formed record inside the UK;
+// nobody can edit or delete from the app (moderate in the Firebase console).
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isString(v, maxLen) {
+      return v is string && v.size() <= maxLen;
+    }
+
+    function optionalString(d, key, maxLen) {
+      return !(key in d) || isString(d[key], maxLen);
+    }
+
+    function validDefib(d) {
+      return d.keys().hasOnly([
+          'lat', 'lng', 'geohash', 'accessType', 'openingHours', 'locationDescription',
+          'pinCode', 'contact', 'photoUrl', 'name', 'createdAt', 'schemaVersion'
+        ])
+        && d.keys().hasAll(['lat', 'lng', 'geohash', 'accessType', 'openingHours', 'locationDescription', 'createdAt', 'schemaVersion'])
+        // UK bounding box (incl. Shetland, Scilly and Northern Ireland)
+        && d.lat is number && d.lat >= 49.8 && d.lat <= 60.95
+        && d.lng is number && d.lng >= -8.75 && d.lng <= 1.9
+        && isString(d.geohash, 12)
+        && d.accessType in ['24/7', 'restricted', 'business_hours']
+        && isString(d.openingHours, 200)
+        && isString(d.locationDescription, 500) && d.locationDescription.size() >= 5
+        && optionalString(d, 'pinCode', 12)
+        && optionalString(d, 'contact', 100)
+        && optionalString(d, 'name', 100)
+        && optionalString(d, 'photoUrl', 1000)
+        && d.createdAt == request.time
+        && d.schemaVersion == 1;
+    }
+
+    match /defibrillators/{id} {
+      allow read: if true;
+      allow create: if id.size() <= 64 && validDefib(request.resource.data);
+      allow update, delete: if false;
+    }
+  }
+}
