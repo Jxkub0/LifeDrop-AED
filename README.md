@@ -47,6 +47,8 @@ npx expo run:android        # or: npx expo run:ios
 
 ### Build an Android APK
 
+The easiest way: push to `main` on GitHub and download the `.apk` from the repository's **Releases** page (built by `.github/workflows/build-apps.yml`, signed with the standard React Native debug key so new builds install over old ones). To build it yourself:
+
 ```bash
 npx eas-cli@latest login
 npx eas-cli@latest build -p android --profile preview      # installable .apk
@@ -77,7 +79,7 @@ iPhone apps can only be compiled with Apple's Xcode on macOS (Xcode 26 or newer)
 
 | Route | Needs | Result |
 |---|---|---|
-| **GitHub Actions → unsigned .ipa → sideload** | A GitHub repo with this project (public repos get macOS build minutes free) | Actions tab → *iOS IPA (unsigned, for sideloading)* → *Run workflow*; download the `.ipa` artifact (~25 min). Install it with **Sideloadly** or **AltStore**, which sign it with your own Apple ID. |
+| **GitHub Actions → unsigned .ipa → sideload** | A GitHub repo with this project (public repos get macOS build minutes free) | Every push to `main` runs *Build apps (Android APK + iPhone IPA)* (~25 min) and publishes the `.apk` and `-unsigned.ipa` on the **Releases** page. You can also start it from the Actions tab → *Run workflow*. Install the `.ipa` with **Sideloadly** or **AltStore**, which sign it with your own Apple ID. |
 | **A Mac** | Xcode 26+, CocoaPods | `npm run build:ios:unsigned` → `build/ios/UK-LifeDrop-AED-<version>-unsigned.ipa` (sideload as above), or `npx expo run:ios --device --configuration Release` to install straight to a plugged-in iPhone. |
 | **EAS Build (Expo cloud)** | Expo account + paid Apple Developer Program | `npx eas-cli@latest build -p ios --profile preview` gives a signed ad-hoc build installable from a link on registered iPhones; `--profile production` + `eas submit -p ios` for TestFlight / App Store. |
 
