@@ -1,15 +1,17 @@
 # Builds an UNSIGNED .ipa for sideloading onto an iPhone (Sideloadly / AltStore sign it with
-# your own Apple ID during install). Run it from the Actions tab ("Run workflow"); the .ipa is
+# your own Apple ID during install). Runs on every push to main that changes the app, or from
+# the Actions tab ("Run workflow"). The .ipa is published on the repository's Releases page and
 # attached to the run as an artifact. Public repositories get macOS minutes free.
 name: iOS IPA (unsigned, for sideloading)
 
 on:
   workflow_dispatch:
   push:
-    tags: ['v*']
+    branches: [main]
+    paths-ignore: ['**.md', '.env.example', 'scripts/make_markers.py']
 
 permissions:
-  contents: write # lets tag builds publish the .ipa as a release download
+  contents: write # lets the build publish the .ipa as a release download
 
 jobs:
   ipa:
@@ -55,6 +57,7 @@ jobs:
       - name: Package .ipa
         run: |
           VERSION=$(node -p "require('./package.json').version")
+          echo "APP_VERSION=$VERSION" >> "$GITHUB_ENV"
           mkdir -p build/Payload
           cp -R build/UKLifeDropAED.xcarchive/Products/Applications/UKLifeDropAED.app build/Payload/
           (cd build && zip -qry "UK-LifeDrop-AED-$VERSION-unsigned.ipa" Payload)
@@ -66,10 +69,13 @@ jobs:
           path: build/*.ipa
           retention-days: 30
 
-      - name: Publish as a release download (tag builds only)
-        if: startsWith(github.ref, 'refs/tags/')
+      - name: Publish as a release download
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ios-build-${{ github.run_number }}
+          target_commitish: ${{ github.sha }}
+          name: iPhone build ${{ env.APP_VERSION }} (#${{ github.run_number }})
+          make_latest: true
           files: build/*.ipa
           body: |
             Unsigned iPhone build for sideloading (Sideloadly / AltStore sign it with your Apple ID).
